@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SITTA UT — Informasi Stok Bahan Ajar</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .book-icon {
+      width: 44px; height: 56px;
+      background: linear-gradient(135deg, var(--primary-light), #bfdbfe);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; flex-shrink: 0;
+    }
+    .book-cover {
+      width: 50px;
+      height: 65px;
+      object-fit: cover;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      transition: transform 0.2s ease;
+    }
+    .book-cover:hover {
+      transform: scale(1.05);
+      cursor: pointer;
+    }
+    .stok-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .stok-bar { height: 6px; background: var(--gray-200); border-radius: 3px; flex: 1; min-width: 80px; overflow: hidden; }
+    .stok-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .add-form-row {
+      display: grid; grid-template-columns: repeat(6, 1fr) auto; gap: 10px; align-items: end;
+      background: var(--gray-50); padding: 20px; border-top: 2px solid var(--gray-100);
+    }
+    .summary-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .summary-chip {
+      padding: 8px 16px; background: var(--white); border-radius: var(--radius-sm);
+      border: 1.5px solid var(--gray-200); font-size: 0.8rem; color: var(--gray-700); font-weight: 500;
+    }
+    .summary-chip strong { color: var(--gray-900); font-size: 0.95rem; display: block; }
+    .filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .filter-row input, .filter-row select { min-width: 180px; }
+    .modal-image {
+      width: 100%;
+      max-height: 250px;
+      object-fit: contain;
+      margin-bottom: 15px;
+      border-radius: 8px;
+    }
+    .cover-preview {
+      width: 80px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-top: 5px;
+    }
+    @media (max-width: 900px) {
+      .add-form-row { grid-template-columns: 1fr 1fr; }
+      .filter-row input, .filter-row select { min-width: 140px; }
+    }
+    @media (max-width: 600px) {
+      .add-form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <span class="nav-logo-badge">SITTA</span>
+      <span>Universitas Terbuka</span>
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="stok.html" class="nav-link active">📚 Bahan Ajar</a></li>
+      <li><a href="tracking.html" class="nav-link">🚚 Tracking</a></li>
+      <li><a href="dashboard.html" class="nav-link">🏠 Dashboard</a></li>
+    </ul>
+    <div class="navbar-user">
+      <div class="user-avatar" id="navAvatar">?</div>
+      <button class="btn btn-outline btn-sm" onclick="doLogout()">Keluar</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:12px;">
+        <div>
+          <h1 class="page-title">📚 Informasi Stok Bahan Ajar</h1>
+          <p class="page-subtitle">Peragaan data bahan ajar secara dinamis</p>
+        </div>
+        <button class="btn btn-primary" onclick="toggleAddForm()">
+          ➕ Tambah Stok
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-chips" id="summaryChips"></div>
+
+    <!-- Filter -->
+    <div class="card mb-3" style="margin-bottom:20px;">
+      <div class="card-body" style="padding:16px 20px;">
+        <div class="filter-row">
+          <div class="input-group" style="flex:1;min-width:200px;">
+            <span class="input-icon">🔍</span>
+            <input type="text" id="filterSearch" class="form-control" placeholder="Cari nama / kode barang..." oninput="renderTable()" />
+          </div>
+          <select class="form-control" id="filterJenis" onchange="renderTable()" style="width:auto;">
+            <option value="">Semua Jenis</option>
+            <option value="BMP">BMP</option>
+            <option value="Suplemen">Suplemen</option>
+          </select>
+          <select class="form-control" id="filterStok" onchange="renderTable()" style="width:auto;">
+            <option value="">Semua Stok</option>
+            <option value="low">Stok Rendah (&lt; 200)</option>
+            <option value="ok">Stok Aman (≥ 200)</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="resetFilter()">↺ Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="card-header">
+        📋 Daftar Bahan Ajar
+        <span id="countLabel" style="font-size:0.8rem;font-weight:500;color:var(--gray-500);"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px;">Cover</th>
+              <th>Kode Lokasi</th>
+              <th>Kode Barang</th>
+              <th>Nama Barang</th>
+              <th>Jenis</th>
+              <th>Edisi</th>
+              <th>Stok</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="stokTable"></tbody>
+        </table>
+        <div id="emptyState" class="hidden" style="text-align:center;padding:40px;color:var(--gray-500);">
+          😕 Tidak ada data yang sesuai filter.
+        </div>
+      </div>
+
+      <!-- Add Form (hidden by default) -->
+      <div id="addForm" class="hidden">
+        <div style="padding:16px 20px;background:var(--primary-light);border-top:2px solid var(--primary);font-weight:700;color:var(--primary);">
+          ➕ Tambah Stok Bahan Ajar Baru
+        </div>
+        <div class="add-form-row">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Kode Lokasi</label>
+            <input type="text" id="newLokasi" class="form-control" placeholder="0TMP01" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Kode Barang</label>
+            <input type="text" id="newKode" class="form-control" placeholder="EKMA4216" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Nama Barang</label>
+            <input type="text" id="newNama" class="form-control" placeholder="Nama buku..." />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Jenis</label>
+            <select id="newJenis" class="form-control">
+              <option>BMP</option>
+              <option>Suplemen</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Edisi</label>
+            <input type="number" id="newEdisi" class="form-control" placeholder="1" min="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Stok</label>
+            <input type="number" id="newStok" class="form-control" placeholder="100" min="0" />
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:0;">
+            <button class="btn btn-primary" onclick="tambahStok()">✅ Simpan</button>
+            <button class="btn btn-outline" onclick="toggleAddForm()">✕</button>
+          </div>
+        </div>
+        <div id="addAlert" class="hidden" style="margin:0 20px 16px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Detail -->
+  <div class="modal-overlay" id="modalDetail">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-header">
+        <span>👁️ Detail Bahan Ajar</span>
+        <button class="modal-close" onclick="closeModal('modalDetail')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="detailContent"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modalDetail')">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Hapus -->
+  <div class="modal-overlay" id="modalHapus">
+    <div class="modal" style="max-width:380px;">
+      <div class="modal-header">
+        <span>⚠️ Konfirmasi Hapus</span>
+        <button class="modal-close" onclick="closeModal('modalHapus')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>Apakah Anda yakin ingin menghapus bahan ajar <strong id="hapusNama"></strong>?</p>
+        <p class="text-muted text-sm mt-1" style="margin-top:8px;">Tindakan ini tidak dapat dibatalkan.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modalHapus')">Batal</button>
+        <button class="btn btn-danger btn-sm" onclick="konfirmasiHapus()">🗑️ Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // DATA BAHAN AJAR DENGAN GAMBAR COVER
+    let dataBahanAjar = [
+      {
+        kodeLokasi: "OTP001",
+        kodeBarang: "SKOM4101",
+        namaBarang: "Pengantar Ilmu Komunikasi",
+        jenisBarang: "BMP",
+        edisi: "2",
+        stok: 548,
+        coverImage: "pengantar_komunikasi.jpg"
+      },
+      {
+        kodeLokasi: "OJKTO1",
+        kodeBarang: "EKMA4213",
+        namaBarang: "Manajemen Keuangan",
+        jenisBarang: "BMP",
+        edisi: "2",
+        stok: 392,
+        coverImage: "manajemen_keuangan.jpg"
+      },
+      {
+        kodeLokasi: "OSBY02",
+        kodeBarang: "ADPU4334",
+        namaBarang: "Kepemimpinan",
+        jenisBarang: "BMP",
+        edisi: "2",
+        stok: 278,
+        coverImage: "kepemimpinan.jpg"
+      },
+      {
+        kodeLokasi: "OMLG01",
+        kodeBarang: "BIOL4211",
+        namaBarang: "Mikrobiologi Dasar",
+        jenisBarang: "BMP",
+        edisi: "2",
+        stok: 165,
+        coverImage: "mikrobiologi.jpg"
+      },
+      {
+        kodeLokasi: "OUPBJBDG",
+        kodeBarang: "PAUD4401",
+        namaBarang: "Perkembangan Anak Usia Dini",
+        jenisBarang: "BMP",
+        edisi: "2",
+        stok: 204,
+        coverImage: "paud_perkembangan.jpeg"
+      }
+    ];
+
+    let stokData = [...dataBahanAjar];
+    let hapusIndex = -1;
+    const MAX_STOK = 600;
+    
+    // Helper functions
+    function formatNumber(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+    
+    function showModal(modalId) {
+      document.getElementById(modalId).classList.add('active');
+    }
+    
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+    
+    function checkAuth() {
+      const user = sessionStorage.getItem('user');
+      if (!user) {
+        window.location.href = 'index.html';
+        return null;
+      }
+      return JSON.parse(user);
+    }
+    
+    function renderSummary() {
+      const total = stokData.reduce((a, b) => a + b.stok, 0);
+      const low = stokData.filter(b => b.stok < 200).length;
+      const chips = document.getElementById('summaryChips');
+      chips.innerHTML = `
+        <div class="summary-chip"><strong>${stokData.length}</strong>Jenis Bahan Ajar</div>
+        <div class="summary-chip"><strong>${formatNumber(total)}</strong>Total Stok</div>
+        <div class="summary-chip" style="border-color:${low > 0 ? 'var(--danger)':'var(--success)'};">
+          <strong style="color:${low > 0 ? 'var(--danger)':'var(--success)'}">${low}</strong>Perlu Restock</div>
+      `;
+    }
+    
+    function getCoverImage(coverName) {
+      if (coverName && coverName !== 'null') {
+        return `<img src="images/${coverName}" 
+                    class="book-cover" 
+                    alt="Cover Buku"
+                    onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';"> 
+                <div class="book-icon" style="display:none;">📗</div>`;
+      }
+      return `<div class="book-icon">📗</div>`;
+    }
+    
+    function renderTable() {
+      const search = document.getElementById('filterSearch').value.toLowerCase();
+      const jenis = document.getElementById('filterJenis').value;
+      const stokFilter = document.getElementById('filterStok').value;
+      
+      const filtered = stokData.filter(b => {
+        const matchSearch = b.namaBarang.toLowerCase().includes(search) || b.kodeBarang.toLowerCase().includes(search);
+        const matchJenis = !jenis || b.jenisBarang === jenis;
+        const matchStok = !stokFilter || (stokFilter === 'low' && b.stok < 200) || (stokFilter === 'ok' && b.stok >= 200);
+        return matchSearch && matchJenis && matchStok;
+      });
+      
+      document.getElementById('countLabel').textContent = `(${filtered.length} dari ${stokData.length})`;
+      
+      const tbody = document.getElementById('stokTable');
+      const empty = document.getElementById('emptyState');
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      
+      tbody.innerHTML = '';
+      filtered.forEach((b, idx) => {
+        // Find the real index in stokData to ensure deletion works correctly
+        const realIndex = stokData.findIndex(item => 
+          item.kodeBarang === b.kodeBarang && 
+          item.kodeLokasi === b.kodeLokasi &&
+          item.namaBarang === b.namaBarang &&
+          item.edisi === b.edisi
+        );
+        const pct = Math.min(Math.round((b.stok / MAX_STOK) * 100), 100);
+        const barColor = b.stok < 200 ? 'var(--danger)' : b.stok < 400 ? 'var(--warning)' : 'var(--success)';
+        const statusBadge = b.stok < 200
+          ? '<span class="badge badge-danger">Perlu Restock</span>'
+          : '<span class="badge badge-success">Tersedia</span>';
+        
+        tbody.innerHTML += `
+          <tr>
+            <td>${getCoverImage(b.coverImage)}</td>
+            <td><code style="font-size:0.78rem;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${b.kodeLokasi}</code></td>
+            <td><code style="font-size:0.78rem;background:var(--primary-light);color:var(--primary);padding:2px 6px;border-radius:4px;">${b.kodeBarang}</code></td>
+            <td><strong style="font-size:0.875rem;">${b.namaBarang}</strong></td>
+            <td>${b.jenisBarang}</td>
+            <td>Ed. ${b.edisi}</td>
+            <td>
+              <div class="stok-bar-wrap">
+                <span class="stok-number ${b.stok < 200 ? 'stok-low' : 'stok-high'}">${b.stok}</span>
+                <div class="stok-bar">
+                  <div class="stok-bar-fill" style="width:${pct}%;background:${barColor};"></div>
+                </div>
+              </div>
+            </td>
+            <td>${statusBadge}</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-outline btn-sm" onclick="lihatDetail(${realIndex})" title="Lihat Detail">👁️</button>
+                <button class="btn btn-danger btn-sm" onclick="hapusStok(${realIndex})">🗑️ Hapus</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+    }
+    
+    function lihatDetail(index) {
+      if (index < 0 || index >= stokData.length) return;
+      const b = stokData[index];
+      const pct = Math.min(Math.round((b.stok / MAX_STOK) * 100), 100);
+      const barColor = b.stok < 200 ? 'var(--danger)' : b.stok < 400 ? 'var(--warning)' : 'var(--success)';
+      const stokLabel = b.stok < 200
+        ? '<span class="badge badge-danger">⚠️ Perlu Restock</span>'
+        : '<span class="badge badge-success">✅ Tersedia</span>';
+
+      let coverHTML = '';
+      if (b.coverImage && b.coverImage !== 'null') {
+        coverHTML = `<img src="images/${b.coverImage}" class="modal-image" alt="Cover" onerror="this.style.display='none'">`;
+      }
+
+      document.getElementById('detailContent').innerHTML = `
+        ${coverHTML}
+        <table style="width:100%;border-collapse:collapse;font-size:0.875rem;">
+          <tr style="border-bottom:1px solid var(--gray-200);">
+            <td style="padding:8px 4px;color:var(--gray-500);font-weight:500;width:42%;">Kode Lokasi</td>
+            <td style="padding:8px 4px;"><code style="background:var(--gray-100);padding:2px 6px;border-radius:4px;">${b.kodeLokasi}</code></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-200);">
+            <td style="padding:8px 4px;color:var(--gray-500);font-weight:500;">Kode Barang</td>
+            <td style="padding:8px 4px;"><code style="background:var(--primary-light);color:var(--primary);padding:2px 6px;border-radius:4px;">${b.kodeBarang}</code></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-200);">
+            <td style="padding:8px 4px;color:var(--gray-500);font-weight:500;">Nama Barang</td>
+            <td style="padding:8px 4px;"><strong>${b.namaBarang}</strong></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-200);">
+            <td style="padding:8px 4px;color:var(--gray-500);font-weight:500;">Jenis Barang</td>
+            <td style="padding:8px 4px;">${b.jenisBarang}</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-200);">
+            <td style="padding:8px 4px;color:var(--gray-500);font-weight:500;">Edisi</td>
+            <td style="padding:8px 4px;">Edisi ${b.edisi}</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-200);">
+            <td style="padding:8px 4px;color:var(--gray-500);font-weight:500;">Stok</td>
+            <td style="padding:8px 4px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <strong style="color:${barColor};font-size:1rem;">${b.stok}</strong> eksemplar
+              </div>
+              <div style="height:6px;background:var(--gray-200);border-radius:3px;overflow:hidden;margin-top:6px;">
+                <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;"></div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 4px;color:var(--gray-500);font-weight:500;">Status</td>
+            <td style="padding:8px 4px;">${stokLabel}</td>
+          </tr>
+        </table>
+      `;
+      showModal('modalDetail');
+    }
+
+    function hapusStok(index) {
+      if (index >= 0 && index < stokData.length) {
+        hapusIndex = index;
+        document.getElementById('hapusNama').textContent = '"' + stokData[index].namaBarang + '"';
+        showModal('modalHapus');
+      } else {
+        console.error("Invalid index for deletion:", index);
+        alert("Terjadi kesalahan: Data tidak valid.");
+      }
+    }
+    
+    function konfirmasiHapus() {
+      if (hapusIndex >= 0 && hapusIndex < stokData.length) {
+        stokData.splice(hapusIndex, 1);
+        hapusIndex = -1;
+        closeModal('modalHapus');
+        renderTable();
+        renderSummary();
+      } else {
+        console.error("Invalid hapusIndex:", hapusIndex);
+        closeModal('modalHapus');
+      }
+    }
+    
+    function toggleAddForm() {
+      const form = document.getElementById('addForm');
+      form.classList.toggle('hidden');
+      if (!form.classList.contains('hidden')) {
+        document.getElementById('addAlert').classList.add('hidden');
+        ['newLokasi','newKode','newNama','newEdisi','newStok'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('newJenis').value = 'BMP';
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+    
+    function tambahStok() {
+      const lokasi = document.getElementById('newLokasi').value.trim();
+      const kode   = document.getElementById('newKode').value.trim();
+      const nama   = document.getElementById('newNama').value.trim();
+      const jenis  = document.getElementById('newJenis').value;
+      const edisi  = document.getElementById('newEdisi').value.trim();
+      const stok   = parseInt(document.getElementById('newStok').value);
+      const alertEl = document.getElementById('addAlert');
+      
+      if (!lokasi || !kode || !nama || !edisi || isNaN(stok) || stok < 0) {
+        alertEl.className = 'alert alert-danger';
+        alertEl.textContent = '⚠️ Semua kolom wajib diisi dengan benar.';
+        alertEl.classList.remove('hidden');
+        return;
+      }
+      
+      const newItem = { 
+        kodeLokasi: lokasi, 
+        kodeBarang: kode, 
+        namaBarang: nama, 
+        jenisBarang: jenis, 
+        edisi: parseInt(edisi), 
+        stok: stok, 
+        coverImage: null 
+      };
+      stokData.push(newItem);
+      renderTable();
+      renderSummary();
+      toggleAddForm();
+    }
+    
+    function resetFilter() {
+      document.getElementById('filterSearch').value = '';
+      document.getElementById('filterJenis').value = '';
+      document.getElementById('filterStok').value = '';
+      renderTable();
+    }
+    
+    window.doLogout = function() {
+      if (confirm('Keluar dari SITTA?')) {
+        sessionStorage.removeItem('user');
+        window.location.href = 'index.html';
+      }
+    };
+    
+    // Inisialisasi
+    const currentUser = checkAuth();
+    if (currentUser) {
+      document.getElementById('navAvatar').textContent = currentUser.nama ? currentUser.nama.charAt(0).toUpperCase() : 'U';
+    }
+    renderSummary();
+    renderTable();
+  </script>
+</body>
+</html>

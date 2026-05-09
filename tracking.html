@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SITTA UT — Tracking Pengiriman</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .tracking-card {
+      background: var(--white); border-radius: var(--radius);
+      box-shadow: var(--shadow-md); border: 1.5px solid var(--gray-100);
+      overflow: hidden; margin-top: 24px;
+      animation: fadeIn 0.35s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .tracking-hero {
+      background: linear-gradient(135deg, var(--primary) 0%, #3b82f6 100%);
+      padding: 24px 28px; color: white;
+      display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;
+    }
+    .tracking-hero h2 { font-size: 1.3rem; }
+    .tracking-hero .do-num { font-family: var(--font-mono); font-size: 0.85rem; opacity: 0.8; margin-top: 2px; }
+    .tracking-hero .status-badge {
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 0.8rem; font-weight: 700; white-space: nowrap;
+    }
+    .status-dikirim { background: #dcfce7; color: #166534; }
+    .status-perjalanan { background: #fef9c3; color: #854d0e; }
+    .detail-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    }
+    .detail-item {
+      padding: 18px 20px; border-right: 1px solid var(--gray-100); border-bottom: 1px solid var(--gray-100);
+    }
+    .detail-item:last-child, .detail-item:nth-child(4n) { border-right: none; }
+    .detail-item .label { font-size: 0.75rem; color: var(--gray-500); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .detail-item .value { font-size: 0.9rem; font-weight: 600; color: var(--gray-900); }
+    .search-box {
+      background: var(--white); border-radius: var(--radius);
+      padding: 24px 28px; box-shadow: var(--shadow-sm); border: 1.5px solid var(--gray-100);
+    }
+    .search-row { display: flex; gap: 12px; align-items: flex-end; }
+    .search-row .form-group { flex: 1; margin-bottom: 0; }
+    .hint-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .hint-chip {
+      padding: 4px 12px; background: var(--gray-100); border-radius: 20px;
+      font-size: 0.78rem; color: var(--gray-600); cursor: pointer; border: none;
+      font-family: var(--font); transition: background 0.15s;
+    }
+    .hint-chip:hover { background: var(--primary-light); color: var(--primary); }
+    @media (max-width: 700px) {
+      .detail-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .detail-grid { grid-template-columns: 1fr; }
+      .search-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <span class="nav-logo-badge">SITTA</span>
+      <span>Universitas Terbuka</span>
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="stok.html" class="nav-link">📚 Bahan Ajar</a></li>
+      <li><a href="tracking.html" class="nav-link active">🚚 Tracking</a></li>
+      <li><a href="dashboard.html" class="nav-link">🏠 Dashboard</a></li>
+    </ul>
+    <div class="navbar-user">
+      <div class="user-avatar" id="navAvatar">?</div>
+      <button class="btn btn-outline btn-sm" onclick="doLogout()">Keluar</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">🚚 Tracking Pengiriman</h1>
+      <p class="page-subtitle">Masukkan Nomor Delivery Order untuk melacak status pengiriman</p>
+    </div>
+
+    <!-- Search Box -->
+    <div class="search-box">
+      <div class="search-row">
+        <div class="form-group">
+          <label class="form-label">Nomor Delivery Order (DO)</label>
+          <div class="input-group">
+            <span class="input-icon">🔍</span>
+            <input type="text" id="inputDO" class="form-control" placeholder="Contoh: 2023001234"
+              oninput="clearResult()" onkeydown="if(event.key==='Enter') cariTracking()" />
+          </div>
+        </div>
+        <button class="btn btn-primary" style="padding:11px 24px;" onclick="cariTracking()">
+          🔍 Cari
+        </button>
+      </div>
+      <div class="hint-chips">
+        <span style="font-size:0.78rem;color:var(--gray-500);align-self:center;">Coba: </span>
+        <button class="hint-chip" onclick="fillDO('2023001234')">2023001234</button>
+        <button class="hint-chip" onclick="fillDO('2023005678')">2023005678</button>
+      </div>
+    </div>
+
+    <!-- Alert -->
+    <div id="trackingAlert" class="hidden" style="margin-top:16px;"></div>
+
+    <!-- Result -->
+    <div id="trackingResult" class="hidden"></div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    const currentUser = checkAuth();
+    if (!currentUser) throw new Error('Auth failed');
+    
+    function fillDO(val) {
+      document.getElementById('inputDO').value = val;
+      cariTracking();
+    }
+    
+    function clearResult() {
+      document.getElementById('trackingResult').classList.add('hidden');
+      document.getElementById('trackingAlert').classList.add('hidden');
+    }
+    
+    function cariTracking() {
+      const noDO = document.getElementById('inputDO').value.trim();
+      const alertEl = document.getElementById('trackingAlert');
+      const resultEl = document.getElementById('trackingResult');
+      
+      alertEl.className = 'hidden';
+      resultEl.classList.add('hidden');
+      
+      if (!noDO) {
+        alertEl.className = 'alert alert-danger';
+        alertEl.textContent = '⚠️ Masukkan nomor Delivery Order terlebih dahulu.';
+        return;
+      }
+      
+      const data = dataTracking[noDO];
+      if (!data) {
+        alertEl.className = 'alert alert-danger';
+        alertEl.innerHTML = `⚠️ Nomor DO <strong>${noDO}</strong> tidak ditemukan dalam sistem.`;
+        return;
+      }
+      
+      // Build progress steps
+      const steps = [
+        { label: 'Diterima', icon: '📬' },
+        { label: 'Di Hub', icon: '🏭' },
+        { label: 'Transit', icon: '🚛' },
+        { label: 'Kota Tujuan', icon: '🏙️' },
+        { label: 'Proses Antar', icon: '🚚' },
+        { label: 'Terkirim', icon: '✅' },
+      ];
+      const currentStep = data.perjalanan.length;
+      let stepsHTML = '<div class="progress-steps">';
+      steps.forEach((s, i) => {
+        let cls = '';
+        if (i < currentStep - 1) cls = 'done';
+        else if (i === currentStep - 1) cls = 'current';
+        stepsHTML += `<div class="step ${cls}">
+          <div class="step-dot">${cls === 'done' ? '✓' : (i + 1)}</div>
+          <div class="step-label">${s.label}</div>
+        </div>`;
+      });
+      stepsHTML += '</div>';
+      
+      // Timeline
+      let timelineHTML = '<div class="timeline">';
+      const reversedJourney = [...data.perjalanan].reverse();
+      reversedJourney.forEach((p, i) => {
+        const cls = i === 0 ? (data.status === 'Dikirim' ? 'done' : 'current') : 'done';
+        timelineHTML += `<div class="timeline-item ${cls}">
+          <div class="timeline-dot"></div>
+          <div class="timeline-time">${p.waktu}</div>
+          <div class="timeline-text">${p.keterangan}</div>
+        </div>`;
+      });
+      timelineHTML += '</div>';
+      
+      const statusClass = data.status === 'Dikirim' ? 'status-dikirim' : 'status-perjalanan';
+      
+      resultEl.innerHTML = `
+        <div class="tracking-card">
+          <div class="tracking-hero">
+            <div>
+              <h2>${data.nama}</h2>
+              <div class="do-num">No. DO: ${data.nomorDO}</div>
+            </div>
+            <div>
+              <span class="status-badge ${statusClass}">${data.status === 'Dikirim' ? '✅' : '🚚'} ${data.status}</span>
+            </div>
+          </div>
+          
+          <div class="detail-grid">
+            <div class="detail-item">
+              <div class="label">Ekspedisi</div>
+              <div class="value">${data.ekspedisi}</div>
+            </div>
+            <div class="detail-item">
+              <div class="label">Tanggal Kirim</div>
+              <div class="value">${data.tanggalKirim}</div>
+            </div>
+            <div class="detail-item">
+              <div class="label">Jenis Paket</div>
+              <div class="value">${data.paket}</div>
+            </div>
+            <div class="detail-item">
+              <div class="label">Total Pembayaran</div>
+              <div class="value" style="color:var(--primary);">${data.total}</div>
+            </div>
+          </div>
+          
+          <div style="padding: 24px 28px;">
+            <h3 style="font-size:1rem;margin-bottom:16px;color:var(--gray-900);">📍 Progress Pengiriman</h3>
+            ${stepsHTML}
+            
+            <h3 style="font-size:1rem;margin:24px 0 16px;color:var(--gray-900);">🗺️ Perjalanan Paket</h3>
+            ${timelineHTML}
+          </div>
+        </div>`;
+      
+      resultEl.classList.remove('hidden');
+    }
+    
+    // Override doLogout dari global
+    window.doLogout = function() {
+      if (confirm('Keluar dari SITTA?')) {
+        sessionStorage.removeItem('user');
+        window.location.href = 'index.html';
+      }
+    };
+    
+    // Auto-fill from URL param
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('do')) {
+      document.getElementById('inputDO').value = params.get('do');
+      setTimeout(cariTracking, 300);
+    }
+  </script>
+</body>
+</html>
